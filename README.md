@@ -11,3 +11,6 @@
 - Rayleigh-Benard convection
 
 ## Codebase
+- Baseline_NonEqu: Standard Non-equivariant ResNet and U-net
+- Equivariant-Models: ResNets and U-nets equipped with four different symmetries, including uniform motion, scaling, magnitude, rotation.
+- Evaluation: Jupyter notebook & RMSE and Energy Spectrum functions.
