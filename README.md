@@ -8,6 +8,6 @@
 
 ## Dataset
 - Heat Diffusion
-- Rayleigh-B\'enard convection
+- Rayleigh-Benard convection
 
 ## Codebase
