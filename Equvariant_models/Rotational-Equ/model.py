@@ -60,9 +60,9 @@ class ResNet(torch.nn.Module):
         )
         layers = [self.input_layer]
         layers += [Resblock(16, 32, kernel_size, N, False), Resblock(32, 32, kernel_size, N, True)]
-        #layers += [Resblock(32, 64, kernel_size, N, False), Resblock(64, 64, kernel_size, N, True)]
-        #layers += [Resblock(64, 128, kernel_size, N, False), Resblock(128, 128, kernel_size, N, True)]
-        #layers += [Resblock(128, 192, kernel_size, N, False), Resblock(192, 192, kernel_size, N, True)]
+        layers += [Resblock(32, 64, kernel_size, N, False), Resblock(64, 64, kernel_size, N, True)]
+        layers += [Resblock(64, 128, kernel_size, N, False), Resblock(128, 128, kernel_size, N, True)]
+        layers += [Resblock(128, 192, kernel_size, N, False), Resblock(192, 192, kernel_size, N, True)]
         layers += [nn.R2Conv(self.feat_type_hid_out, self.feat_type_out, kernel_size = kernel_size, padding = (kernel_size - 1)//2)]
         self.model = torch.nn.Sequential(*layers)
     

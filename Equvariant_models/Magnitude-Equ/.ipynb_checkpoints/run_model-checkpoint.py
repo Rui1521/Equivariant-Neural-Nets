@@ -42,7 +42,7 @@ train_mse = []
 valid_mse = []
 test_mse = []
 
-for i in range(10):
+for i in range(100):
     start = time.time()
     scheduler.step()
 

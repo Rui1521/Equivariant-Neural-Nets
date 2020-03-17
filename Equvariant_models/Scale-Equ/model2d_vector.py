@@ -117,24 +117,6 @@ class scale_conv2d(nn.Module):
         
         return out 
     
-class scale_cnn2d(nn.Module):
-    def __init__(self, out_channels, in_channels, kernel_size, hidden_dim, num_layers):
-        super(scale_cnn2d, self).__init__()
-        self.input_layer = scale_conv2d(out_channels = hidden_dim, in_channels = in_channels, kernel_size = kernel_size)
-        
-        self.middle_layer = nn.Sequential(*[scale_conv2d(out_channels = hidden_dim, in_channels = hidden_dim, 
-                                                         kernel_size = kernel_size) for i in range(num_layers - 2)])
-        
-        self.final_layer = scale_conv2d(out_channels = out_channels, in_channels = hidden_dim, 
-                                        kernel_size = kernel_size, sout = 1, activation = False)
-    
-    def forward(self, xx):
-        out = self.input_layer(xx)
-        out = self.middle_layer(out)
-        out = self.final_layer(out)     
-        out = out.squeeze(1)
-        return out
-    
     
 class Resblock(nn.Module):
     def __init__(self, in_channels, hidden_dim, kernel_size, skip = True):

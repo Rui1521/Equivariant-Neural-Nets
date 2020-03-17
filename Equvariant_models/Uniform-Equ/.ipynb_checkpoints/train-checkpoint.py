@@ -55,13 +55,12 @@ def train_epoch(train_loader, model, optimizer, loss_function):
             xx = torch.cat([xx[:, 2:], im], 1)
             loss += loss_function(im, y)
            
-        #print(im.shape, y.shape)
         train_mse.append(loss.item()/yy.shape[1]) 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if k%50 ==0:
-            print(str(k)+ "/" + str(6000//16))
+#         if k%50 ==0:
+#             print(str(k)+ "/" + str(6000//16))
     train_mse = round(np.sqrt(np.mean(train_mse)),5)
     return train_mse
 
