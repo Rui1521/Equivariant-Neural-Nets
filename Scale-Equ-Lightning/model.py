@@ -185,27 +185,27 @@ class Scale_ResNet(pl.LightningModule):
         return out
     
     def setup(self, stage):
-        direc = "/global/cscratch1/sd/rwang2/Equivariance/Ocean/Data/Ocean_Data_DeepCFD/Data/"
+        direc = "/gpfs/wolf/gen138/proj-shared/deepcfd/data/Ocean_Data_DeepCFD/Data/"
         train_direc = direc + "train/sample_"
         valid_direc = direc + "valid/sample_"
         test_direc = direc + "test/sample_"
 
-        train_indices = list(range(7200)) 
-        valid_indices = list(range(1600)) 
-        test_indices = list(range(1600))   
+        train_indices = list(range(72))
+        valid_indices = list(range(16))
+        test_indices = list(range(16))
 
         self.train_dataset = Dataset(train_indices, self.input_length, 40, self.output_length, train_direc)
         self.val_dataset = Dataset(valid_indices, self.input_length, 40, 6, valid_direc)
         self.test_dataset = Dataset(test_indices, self.input_length, 40, 10, test_direc) 
     
     def train_dataloader(self):
-        return data.DataLoader(self.train_dataset, batch_size = 16, shuffle = True) 
+        return data.DataLoader(self.train_dataset, batch_size = 4, shuffle = True) 
     
     def val_dataloader(self):
-        return data.DataLoader(self.val_dataset, batch_size = 16, shuffle = False)
+        return data.DataLoader(self.val_dataset, batch_size = 4, shuffle = False)
     
     def test_dataloader(self):
-        return data.DataLoader(self.test_dataset, batch_size = 16, shuffle = False)
+        return data.DataLoader(self.test_dataset, batch_size = 4, shuffle = False)
 
     
     def training_step(self, train_batch, batch_idx):
