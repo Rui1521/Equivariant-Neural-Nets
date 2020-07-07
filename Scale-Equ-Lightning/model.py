@@ -185,14 +185,14 @@ class Scale_ResNet(pl.LightningModule):
         return out
     
     def setup(self, stage):
-        direc = "/home/ec2-user/SageMaker/efs/Danielle/Ray/Fluid/Data/"
-        train_direc = direc + "sample_"
-        valid_direc = direc + "sample_"
-        test_direc = direc + "sample_"
+        direc = "/gpfs/wolf/gen138/proj-shared/deepcfd/data/Ocean_Data_DeepCFD/Data/"
+        train_direc = direc + "train/sample_"
+        valid_direc = direc + "valid/sample_"
+        test_direc = direc + "test/sample_"
 
-        train_indices = list(range(72)) 
-        valid_indices = list(range(16)) 
-        test_indices = list(range(16))   
+        train_indices = list(range(72))
+        valid_indices = list(range(16))
+        test_indices = list(range(16))
 
         self.train_dataset = Dataset(train_indices, self.input_length, 40, self.output_length, train_direc)
         self.val_dataset = Dataset(valid_indices, self.input_length, 40, 6, valid_direc)

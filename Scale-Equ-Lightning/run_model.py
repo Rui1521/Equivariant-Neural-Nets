@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = Scale_ResNet()
-trainer = pl.Trainer(gpus=8, max_epochs=10, distributed_backend='ddp')
+trainer = pl.Trainer(gpus=6, max_epochs=10, distributed_backend='ddp')
 trainer.fit(model)
 
 trainer.test()
