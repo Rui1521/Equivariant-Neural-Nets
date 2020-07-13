@@ -1,3 +1,7 @@
+# Timemory profiling 
+import timemory
+from timemory.profiler import profile
+
 import torch
 import math
 import numpy as np
@@ -7,7 +11,10 @@ import pytorch_lightning as pl
 import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class Conv2d(pl.LightningModule):
+
+    @profile(["wall_clock"])
     def __init__(self, out_channels, in_channels, kernel_size, l = 3, sout = 5, stride = 1, activation = True):
         super(Conv2d, self).__init__()
         self.out_channels= out_channels
@@ -24,11 +31,14 @@ class Conv2d(pl.LightningModule):
         #self.batchnorm = nn.BatchNorm3d(sout)# affine=False
         self.stride = stride
         
+
+    @profile(["wall_clock"])
     def reset_parameters(self):
         self.weights.data.uniform_(-self.stdv, self.stdv)
         if self.bias is not None:
             self.bias.data.fill_(0)
             
+    @profile(["wall_clock"])
     def shrink_kernel(self, kernel, up_scale):
         up_scale = torch.tensor(up_scale).float()
         pad_in = (torch.ceil(up_scale**2).int())*((kernel.shape[2]-1)//2)
@@ -57,6 +67,7 @@ class Conv2d(pl.LightningModule):
             new_kernel = new_kernel * (kernel.shape[-1]**2/((kernel.shape[-1] - 2*up_scale)**2 + 0.01))
         return new_kernel
     
+    @profile(["wall_clock"])
     def dilate_kernel(self, kernel, dilation):
         if dilation == 0:
             return kernel 
@@ -93,7 +104,8 @@ class Conv2d(pl.LightningModule):
             #new_kernel = new_kernel/new_kernel.sum()*kernel.sum()
         return new_kernel[:,:,-kernel.shape[2]:]
     
-    
+
+    @profile(["wall_clock"])
     def forward(self, xx):
         #print(self.weights.shape, xx.shape)
         out = []
@@ -124,6 +136,8 @@ class Conv2d(pl.LightningModule):
     
     
 class Resblock(pl.LightningModule):
+
+    @profile(["wall_clock"])
     def __init__(self, in_channels, hidden_dim, kernel_size, skip = True):
         super(Resblock, self).__init__()
         self.layer1 = Conv2d(out_channels = hidden_dim, in_channels = in_channels, kernel_size = kernel_size)
@@ -132,6 +146,8 @@ class Resblock(pl.LightningModule):
         
         self.skip = skip
         
+
+    @profile(["wall_clock"])
     def forward(self, x):
         out = self.layer1(x)
         if self.skip:
@@ -140,7 +156,10 @@ class Resblock(pl.LightningModule):
             out = self.layer2(out)
         return out
     
+
 class Scale_ResNet(pl.LightningModule):
+
+    @profile(["wall_clock"])
     def __init__(self):
         super(Scale_ResNet, self).__init__()
         
@@ -159,18 +178,22 @@ class Scale_ResNet(pl.LightningModule):
         layers += [Conv2d(out_channels = 2, in_channels = 128, kernel_size = kernel_size, sout = 1, activation = False)]
         self.model = nn.Sequential(*layers)
         
+    @profile(["wall_clock"])
     def forward(self, xx):
         out = self.model(xx)
         out = out.squeeze(1)
         return out
     
+    @profile(["wall_clock"])
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), 0.001, betas=(0.9, 0.999), weight_decay=4e-4)
         return optimizer
     
+    @profile(["wall_clock"])
     def loss_fun(self, preds, target):
         return torch.nn.MSELoss()(preds, target)  
     
+    @profile(["wall_clock"])
     def blur_input(self, xx): 
         out = []
         for s in np.linspace(-1, 1, 5):
@@ -184,6 +207,7 @@ class Scale_ResNet(pl.LightningModule):
         out = torch.cat(out, dim = 1)
         return out
     
+    @profile(["wall_clock"])
     def setup(self, stage):
         direc = "/gpfs/wolf/gen138/proj-shared/deepcfd/data/Ocean_Data_DeepCFD/Data/"
         train_direc = direc + "train/sample_"
@@ -198,16 +222,19 @@ class Scale_ResNet(pl.LightningModule):
         self.val_dataset = Dataset(valid_indices, self.input_length, 40, 6, valid_direc)
         self.test_dataset = Dataset(test_indices, self.input_length, 40, 10, test_direc) 
     
+    @profile(["wall_clock"])
     def train_dataloader(self):
         return data.DataLoader(self.train_dataset, batch_size = 4, shuffle = True) 
     
+    @profile(["wall_clock"])
     def val_dataloader(self):
         return data.DataLoader(self.val_dataset, batch_size = 4, shuffle = False)
     
+    @profile(["wall_clock"])
     def test_dataloader(self):
         return data.DataLoader(self.test_dataset, batch_size = 4, shuffle = False)
 
-    
+    @profile(["wall_clock"])
     def training_step(self, train_batch, batch_idx):
         xx, yy = train_batch
         loss = 0
@@ -221,6 +248,7 @@ class Scale_ResNet(pl.LightningModule):
         train_rmse = round(np.sqrt(loss.item()/yy.shape[2]), 5)
         return {'loss': loss, 'train_rmse': train_rmse}
     
+    @profile(["wall_clock"])
     def validation_step(self, val_batch, batch_idx):
         xx, yy = val_batch
         loss = 0
@@ -236,12 +264,14 @@ class Scale_ResNet(pl.LightningModule):
         ims = torch.cat(ims, axis = 2)
         return {'val_loss': valid_rmse, 'preds': ims, "trues": yy}
     
+    @profile(["wall_clock"])
     def validation_epoch_end(self, outputs):
         avg_loss = round(np.mean([x['val_loss'] for x in outputs]), 5)
         preds = torch.cat([x['preds'] for x in outputs], dim = 0).cpu().data.numpy()
         trues = torch.cat([x['trues'] for x in outputs], dim = 0).cpu().data.numpy()
         return {'valid_rmse': avg_loss, 'preds': preds, 'trues': trues}
     
+    @profile(["wall_clock"])
     def test_step(self, test_batch, batch_idx):
         xx, yy = test_batch
         loss = 0
@@ -257,6 +287,7 @@ class Scale_ResNet(pl.LightningModule):
         ims = torch.cat(ims, axis = 2)
         return {'test_loss': test_rmse, 'preds': ims, "trues": yy}
     
+    @profile(["wall_clock"])
     def test_epoch_end(self, outputs):
         avg_loss = round(np.mean([x['test_loss'] for x in outputs]), 5)
         preds = torch.cat([x['preds'] for x in outputs], dim = 0).cpu().data.numpy()
@@ -266,6 +297,8 @@ class Scale_ResNet(pl.LightningModule):
    
 
 class Dataset(data.Dataset):
+
+    @profile(["wall_clock"])
     def __init__(self, indices, input_length, mid, output_length, direc):
         self.input_length = input_length
         self.mid = mid
@@ -273,9 +306,11 @@ class Dataset(data.Dataset):
         self.direc = direc
         self.list_IDs = indices
         
+    @profile(["wall_clock"])
     def __len__(self):
         return len(self.list_IDs)
 
+    @profile(["wall_clock"])
     def __getitem__(self, index):
         ID = self.list_IDs[index]
         x = torch.load(self.direc + str(ID) + ".pt")[(self.mid-self.input_length):self.mid].transpose(0,1)
@@ -284,10 +319,13 @@ class Dataset(data.Dataset):
     
     
 class gaussain_blur(pl.LightningModule):
+
+    @profile(["wall_clock"])
     def __init__(self, size, sigma, dim, channels):
         super(gaussain_blur, self).__init__()
         self.kernel = self.gaussian_kernel(size, sigma, dim, channels).to(device)
 
+    @profile(["wall_clock"])
     def gaussian_kernel(self, size, sigma, dim, channels):
 
         kernel_size = 2*size + 1
@@ -308,6 +346,7 @@ class gaussain_blur(pl.LightningModule):
 
         return kernel
 
+    @profile(["wall_clock"])
     def forward(self, xx):
         xx = xx.reshape(xx.shape[0]*2, 1, xx.shape[2], xx.shape[3], xx.shape[4])
         xx = F.conv3d(xx, self.kernel, padding = (self.kernel.shape[-1]-1)//2)
