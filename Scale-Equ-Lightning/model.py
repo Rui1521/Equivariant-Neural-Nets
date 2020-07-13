@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class Conv2d(pl.LightningModule):
     def __init__(self, out_channels, in_channels, kernel_size, l = 3, sout = 5, stride = 1, activation = True):
         super(Conv2d, self).__init__()
@@ -57,7 +58,8 @@ class Conv2d(pl.LightningModule):
             new_kernel = new_kernel * (kernel.shape[-1]**2/((kernel.shape[-1] - 2*up_scale)**2 + 0.01))
         return new_kernel
     
-    def dilate_kernel(self, kernel, dilation):
+    @staticmethod
+    def dilate_kernel(kernel, dilation):
         if dilation == 0:
             return kernel 
 
@@ -104,6 +106,9 @@ class Conv2d(pl.LightningModule):
             
             if (s - self.sout//2) < 0:
                 new_kernel = self.shrink_kernel(w, (self.sout//2 - s)/2).to(device)
+            elif (s - self.sout//2) == 1:
+                new_kernel = torch.einsum('cvtxy,txysij->cvsij',w,dilationdict[w.shape[2]]).to(device)
+                #new_kernel = self.dilate_kernel(w, (s - self.sout//2)/2).to(device)
             elif (s - self.sout//2) > 0:
                 new_kernel = self.dilate_kernel(w, (s - self.sout//2)/2).to(device)
             else:
@@ -312,6 +317,26 @@ class gaussain_blur(pl.LightningModule):
         xx = xx.reshape(xx.shape[0]*2, 1, xx.shape[2], xx.shape[3], xx.shape[4])
         xx = F.conv3d(xx, self.kernel, padding = (self.kernel.shape[-1]-1)//2)
         return xx.reshape(xx.shape[0]//2, 2, xx.shape[2], xx.shape[3], xx.shape[4])
+
+
+def pre_compute_dilation(time_dims):
+    dilationdict={}
+    print("Generating Dilation mats")
+    for time_dim in time_dims:
+        print("Time_dim",time_dim)
+        M = torch.Tensor(time_dim,5,5,time_dim,9,9)  #requires_grad = False 
+        xx = torch.zeros(1,1,time_dim,5,5)
+        for ti in tqdm.tqdm(range(time_dim)):
+            for xi in range(5):
+                for yi in range(5):
+                    xx[0,0,ti,xi,yi] = 1.0
+                    M[ti,xi,yi,:,:,:] = Conv2d.dilate_kernel(xx,0.5)
+                    xx[0,0,ti,xi,yi] = 0.0
+        dilationdict[time_dim] = M.to(device)
+    return dilationdict
+
+timedims = [16,25,32,64]
+dilationdict = (pre_compute_dilation(timedims))
 
 # class U_net(nn.Module):
 #     def __init__(self, in_channels, out_channels, kernel_size):
