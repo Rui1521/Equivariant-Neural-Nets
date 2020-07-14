@@ -321,9 +321,9 @@ class gaussain_blur(pl.LightningModule):
 
 def pre_compute_dilation(time_dims):
     dilationdict={}
-    print("Generating Dilation mats")
+    #print("Generating Dilation mats")
     for time_dim in time_dims:
-        print("Time_dim",time_dim)
+        #print("Time_dim",time_dim)
         M = torch.Tensor(time_dim,5,5,time_dim,9,9)  #requires_grad = False 
         xx = torch.zeros(1,1,time_dim,5,5)
         for ti in range(time_dim):
@@ -332,11 +332,11 @@ def pre_compute_dilation(time_dims):
                     xx[0,0,ti,xi,yi] = 1.0
                     M[ti,xi,yi,:,:,:] = Conv2d.dilate_kernel(xx,0.5)
                     xx[0,0,ti,xi,yi] = 0.0
-        dilationdict[time_dim] = M.to(device)
+        dilationdict[time_dim] = M
     return dilationdict
 
 timedims = [16,25,32,64]
-dilationdict = (pre_compute_dilation(timedims))
+dilationdict = pre_compute_dilation(timedims)
 
 # class U_net(nn.Module):
 #     def __init__(self, in_channels, out_channels, kernel_size):
