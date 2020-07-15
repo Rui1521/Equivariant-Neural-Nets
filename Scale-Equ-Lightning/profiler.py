@@ -56,12 +56,6 @@ class Profiler(object, metaclass=Singleton):
             return identity2
 
 
-    def finalize(self):
-        if self.enabled:
-            import timemory
-            timemory.finalize()
-
-
 
 def enable():
     if TIMEMORY_AVAILABLE:
