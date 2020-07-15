@@ -253,7 +253,7 @@ class Scale_ResNet(pl.LightningModule):
         torch.cuda.nvtx.range_push("Scale_ResNet.setup")
         direc = "/gpfs/wolf/gen138/proj-shared/deepcfd/data/Ocean_Data_DeepCFD/Data/"
         # direc = "/gpfs/wolf/gen138/proj-shared/deepcfd/data/Ocean_Data_DeepCFD/Data/"
-        direc = "/global/cfs/cdirs/nstaff/blaschke/hackathon/DeepCFD/Ocean_Data_DeepCFD/Data/"
+        # direc = "/global/cfs/cdirs/nstaff/blaschke/hackathon/DeepCFD/Ocean_Data_DeepCFD/Data/"
         train_direc = direc + "train/sample_"
         valid_direc = direc + "valid/sample_"
         test_direc = direc + "test/sample_"
