@@ -1,5 +1,5 @@
 #
-# Set up profiling
+# Set up profiling -- for pytorch lightning this needs to be done first
 #
 
 import profiler
@@ -24,7 +24,6 @@ import pytorch_lightning as pl
 #os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 #os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3,4,5,6,7"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 
 model = Scale_ResNet()
