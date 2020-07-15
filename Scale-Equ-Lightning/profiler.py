@@ -3,8 +3,8 @@
 
 
 import importlib
-TIMEORY_LOADER = importlib.find_loader("timemory")
-TIMEMORY_AVAIL = TIMEMORY_LOADER is not None
+TIMEMORY_LOADER    = importlib.find_loader("timemory")
+TIMEMORY_AVAILABLE = TIMEMORY_LOADER is not None
 
 
 #
