@@ -1,7 +1,3 @@
-# Timemory profiling 
-import timemory
-
-
 import torch
 from model import Scale_ResNet
 import pytorch_lightning as pl
@@ -9,9 +5,11 @@ import pytorch_lightning as pl
 #os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3,4,5,6,7"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+from profile import Profiler
 
-timemory.settings.flat_profile = True
-timemory.settings.timeline_profile = False
+prof = Profiler()
+prof.enabled = False
+prof.finalize()
 
 
 model = Scale_ResNet()
@@ -20,4 +18,4 @@ trainer.fit(model)
 
 trainer.test()
 
-timemory.finalize()
+prof.finalize()
