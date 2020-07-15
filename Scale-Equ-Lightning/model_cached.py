@@ -8,8 +8,18 @@ import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+from profiler import Profiler
+
+profile = Profiler().profile_decorator
+extended_set = ["cpu_clock", "cpu_util",
+                "page_rss", "virtual_memory"]
+
+
 class Conv2d(pl.LightningModule):
+
+    @profile(extended_set)
     def __init__(self, out_channels, in_channels, kernel_size, l = 3, sout = 5, stride = 1, activation = True):
+        torch.cuda.nvtx.range_push("Conv2d.__init__")
         super(Conv2d, self).__init__()
         self.out_channels= out_channels
         self.in_channels = in_channels
@@ -24,13 +34,21 @@ class Conv2d(pl.LightningModule):
         self.reset_parameters()
         #self.batchnorm = nn.BatchNorm3d(sout)# affine=False
         self.stride = stride
+        torch.cuda.nvtx.range_pop()
         
+
+    @profile(extended_set)
     def reset_parameters(self):
+        torch.cuda.nvtx.range_push("Conv2d.reset_parameters")
         self.weights.data.uniform_(-self.stdv, self.stdv)
         if self.bias is not None:
             self.bias.data.fill_(0)
+        torch.cuda.nvtx.range_pop()
+
             
+    @profile(extended_set)
     def shrink_kernel(self, kernel, up_scale):
+        torch.cuda.nvtx.range_push("Conv2d.shrink_kernel")
         up_scale = torch.tensor(up_scale).float()
         pad_in = (torch.ceil(up_scale**2).int())*((kernel.shape[2]-1)//2)
         pad_h = (torch.ceil(up_scale).int())*((kernel.shape[3]-1)//2)
@@ -56,10 +74,14 @@ class Conv2d(pl.LightningModule):
         new_kernel = F.grid_sample(padded_kernel, grid.to(device))
         if kernel.shape[-1] - 2*up_scale > 0:
             new_kernel = new_kernel * (kernel.shape[-1]**2/((kernel.shape[-1] - 2*up_scale)**2 + 0.01))
+        torch.cuda.nvtx.range_pop()
         return new_kernel
+
     
+    @profile(extended_set)
     @staticmethod
     def dilate_kernel(kernel, dilation):
+        torch.cuda.nvtx.range_push("Conv2d.dilate_kernel")
         if dilation == 0:
             return kernel 
 
@@ -93,10 +115,14 @@ class Conv2d(pl.LightningModule):
 
             new_kernel = F.grid_sample(new_kernel, grid)         
             #new_kernel = new_kernel/new_kernel.sum()*kernel.sum()
+
+        torch.cuda.nvtx.range_pop()
         return new_kernel[:,:,-kernel.shape[2]:]
     
-    
+
+    @profile(extended_set)
     def forward(self, xx):
+        torch.cuda.nvtx.range_push("Cov2d.forward")
         #print(self.weights.shape, xx.shape)
         out = []
         for s in range(self.sout):
@@ -125,28 +151,42 @@ class Conv2d(pl.LightningModule):
             #out = self.batchnorm(out)
             out = F.leaky_relu(out)
         
+        torch.cuda.nvtx.range_pop()
         return out 
     
     
 class Resblock(pl.LightningModule):
+
+    @profile(extended_set)
     def __init__(self, in_channels, hidden_dim, kernel_size, skip = True):
+        torch.cuda.nvtx.range_push("Resblock.__init__")
         super(Resblock, self).__init__()
         self.layer1 = Conv2d(out_channels = hidden_dim, in_channels = in_channels, kernel_size = kernel_size)
      
         self.layer2 = Conv2d(out_channels = hidden_dim, in_channels = hidden_dim, kernel_size = kernel_size) 
         
         self.skip = skip
+        torch.cuda.nvtx.range_pop()
         
+
+    @profile(extended_set)
     def forward(self, x):
+        torch.cuda.nvtx.range_push("Resblock.forward")
         out = self.layer1(x)
         if self.skip:
             out = self.layer2(out) + x
         else:
             out = self.layer2(out)
+
+        torch.cuda.nvtx.range_pop()
         return out
     
+
 class Scale_ResNet(pl.LightningModule):
+
+    @profile(extended_set)
     def __init__(self):
+        torch.cuda.nvtx.range_push("Scale_ResNet.__init__")
         super(Scale_ResNet, self).__init__()
         
         self.input_length = 25
@@ -163,20 +203,40 @@ class Scale_ResNet(pl.LightningModule):
         layers += [Resblock(128, 128, kernel_size, True), Resblock(128, 128, kernel_size, True)]
         layers += [Conv2d(out_channels = 2, in_channels = 128, kernel_size = kernel_size, sout = 1, activation = False)]
         self.model = nn.Sequential(*layers)
+        torch.cuda.nvtx.range_pop()
+
         
+    @profile(extended_set)
     def forward(self, xx):
+        torch.cuda.nvtx.range_push("Scale_ResNet.forward")
         out = self.model(xx)
         out = out.squeeze(1)
+
+        torch.cuda.nvtx.range_pop()
         return out
+
     
+    @profile(extended_set)
     def configure_optimizers(self):
+        torch.cuda.nvtx.range_push("Scale_ResNet.configure_optimizers")
         optimizer = torch.optim.Adam(self.parameters(), 0.001, betas=(0.9, 0.999), weight_decay=4e-4)
+
+        torch.cuda.nvtx.range_pop()
         return optimizer
     
+
+    @profile(extended_set)
     def loss_fun(self, preds, target):
-        return torch.nn.MSELoss()(preds, target)  
+        torch.cuda.nvtx.range_push("Scale_ResNet.loss_fun")
+        loss = torch.nn.MSELoss()(preds, target)  
+
+        torch.cuda.nvtx.range_pop()
+        return loss
+
     
+    @profile(extended_set)
     def blur_input(self, xx): 
+        torch.cuda.nvtx.range_push("Scale_ResNet.blur")
         out = []
         for s in np.linspace(-1, 1, 5):
             if s > 0:
@@ -187,33 +247,58 @@ class Scale_ResNet(pl.LightningModule):
             else:
                 out.append(xx.unsqueeze(1))
         out = torch.cat(out, dim = 1)
+
+        torch.cuda.nvtx.range_pop()
         return out
     
-    def setup(self, stage):
-        direc = "/home/ec2-user/SageMaker/efs/Danielle/Ray/Fluid/Data/"
-        train_direc = direc + "sample_"
-        valid_direc = direc + "sample_"
-        test_direc = direc + "sample_"
 
-        train_indices = list(range(72)) 
-        valid_indices = list(range(16)) 
-        test_indices = list(range(16))   
+    @profile(extended_set)
+    def setup(self, stage):
+        torch.cuda.nvtx.range_push("Scale_ResNet.setup")
+        direc = "/gpfs/wolf/gen138/proj-shared/deepcfd/data/Ocean_Data_DeepCFD/Data/"
+        # direc = "/gpfs/wolf/gen138/proj-shared/deepcfd/data/Ocean_Data_DeepCFD/Data/"
+        direc = "/global/cfs/cdirs/nstaff/blaschke/hackathon/DeepCFD/Ocean_Data_DeepCFD/Data/"
+        train_direc = direc + "train/sample_"
+        valid_direc = direc + "valid/sample_"
+        test_direc = direc + "test/sample_"
+
+        train_indices = list(range(72))
+        valid_indices = list(range(16))
+        test_indices = list(range(16))
 
         self.train_dataset = Dataset(train_indices, self.input_length, 40, self.output_length, train_direc)
         self.val_dataset = Dataset(valid_indices, self.input_length, 40, 6, valid_direc)
         self.test_dataset = Dataset(test_indices, self.input_length, 40, 10, test_direc) 
-    
-    def train_dataloader(self):
-        return data.DataLoader(self.train_dataset, batch_size = 4, shuffle = True) 
-    
-    def val_dataloader(self):
-        return data.DataLoader(self.val_dataset, batch_size = 4, shuffle = False)
-    
-    def test_dataloader(self):
-        return data.DataLoader(self.test_dataset, batch_size = 4, shuffle = False)
+        torch.cuda.nvtx.range_pop()
 
     
+    @profile(extended_set)
+    def train_dataloader(self):
+        torch.cuda.nvtx.range_push("Scale_ResNet.train_dataloader")
+        dl = data.DataLoader(self.train_dataset, batch_size = 4, shuffle = True) 
+        torch.cuda.nvtx.range_pop()
+        return dl
+
+
+    @profile(extended_set)
+    def val_dataloader(self):
+        torch.cuda.nvtx.range_push("Scale_ResNet.val_dataloader")
+        dl = data.DataLoader(self.val_dataset, batch_size = 4, shuffle = False)
+        torch.cuda.nvtx.range_pop()
+        return dl
+
+
+    @profile(extended_set)
+    def test_dataloader(self):
+        torch.cuda.nvtx.range_push("Scale_ResNet.test_dataloader")
+        dl = data.DataLoader(self.test_dataset, batch_size = 4, shuffle = False)
+        torch.cuda.nvtx.range_pop()
+        return dl
+
+
+    @profile(extended_set)
     def training_step(self, train_batch, batch_idx):
+        torch.cuda.nvtx.range_push("Scale_ResNet.training_step")
         xx, yy = train_batch
         loss = 0
         ims = []
@@ -224,9 +309,14 @@ class Scale_ResNet(pl.LightningModule):
             xx = torch.cat([xx[:, :, 1:], im.unsqueeze(2)], 2)
             loss += self.loss_fun(im, yy[:,:,i])
         train_rmse = round(np.sqrt(loss.item()/yy.shape[2]), 5)
+
+        torch.cuda.nvtx.range_pop()
         return {'loss': loss, 'train_rmse': train_rmse}
+
     
+    @profile(extended_set)
     def validation_step(self, val_batch, batch_idx):
+        torch.cuda.nvtx.range_push("Scale_ResNet.validation_step")
         xx, yy = val_batch
         loss = 0
         ims = []
@@ -239,15 +329,25 @@ class Scale_ResNet(pl.LightningModule):
                 
         valid_rmse = round(np.sqrt(loss.item()/yy.shape[2]), 5)
         ims = torch.cat(ims, axis = 2)
+
+        torch.cuda.nvtx.range_pop()
         return {'val_loss': valid_rmse, 'preds': ims, "trues": yy}
+
     
+    @profile(extended_set)
     def validation_epoch_end(self, outputs):
+        torch.cuda.nvtx.range_push("Scale_ResNet.validation_epoch_end")
         avg_loss = round(np.mean([x['val_loss'] for x in outputs]), 5)
         preds = torch.cat([x['preds'] for x in outputs], dim = 0).cpu().data.numpy()
         trues = torch.cat([x['trues'] for x in outputs], dim = 0).cpu().data.numpy()
+
+        torch.cuda.nvtx.range_pop()
         return {'valid_rmse': avg_loss, 'preds': preds, 'trues': trues}
+
     
+    @profile(extended_set)
     def test_step(self, test_batch, batch_idx):
+        torch.cuda.nvtx.range_push("Scale_ResNet.test_step")
         xx, yy = test_batch
         loss = 0
         ims = []
@@ -260,41 +360,64 @@ class Scale_ResNet(pl.LightningModule):
                 
         test_rmse = round(np.sqrt(loss.item()/yy.shape[2]), 5)
         ims = torch.cat(ims, axis = 2)
+
+        torch.cuda.nvtx.range_pop()
         return {'test_loss': test_rmse, 'preds': ims, "trues": yy}
+
     
+    @profile(extended_set)
     def test_epoch_end(self, outputs):
+        torch.cuda.nvtx.range_push("Scale_ResNet.test_epoch_end")
         avg_loss = round(np.mean([x['test_loss'] for x in outputs]), 5)
         preds = torch.cat([x['preds'] for x in outputs], dim = 0).cpu().data.numpy()
         trues = torch.cat([x['trues'] for x in outputs], dim = 0).cpu().data.numpy()
+        torch.cuda.nvtx.range_pop()
         return {'test_rmse': avg_loss, 'preds': preds, 'trues': trues}
     
    
 
 class Dataset(data.Dataset):
+
+    @profile(extended_set)
     def __init__(self, indices, input_length, mid, output_length, direc):
+        torch.cuda.nvtx.range_push("data.Dataset.__init__")
         self.input_length = input_length
         self.mid = mid
         self.output_length = output_length
         self.direc = direc
         self.list_IDs = indices
+        torch.cuda.nvtx.range_pop()
+
         
+    @profile(extended_set)
     def __len__(self):
         return len(self.list_IDs)
 
+
+    @profile(extended_set)
     def __getitem__(self, index):
+        torch.cuda.nvtx.range_push("data.Dataset.__getitem__")
         ID = self.list_IDs[index]
         x = torch.load(self.direc + str(ID) + ".pt")[(self.mid-self.input_length):self.mid].transpose(0,1)
         y = torch.load(self.direc + str(ID) + ".pt")[self.mid:(self.mid+self.output_length)].transpose(0,1)
+
+        torch.cuda.nvtx.range_pop()
         return x.float(), y.float()
     
     
 class gaussain_blur(pl.LightningModule):
+
+    @profile(extended_set)
     def __init__(self, size, sigma, dim, channels):
+        torch.cuda.nvtx.range_push("gaussain_blur.__init__")
         super(gaussain_blur, self).__init__()
         self.kernel = self.gaussian_kernel(size, sigma, dim, channels).to(device)
+        torch.cuda.nvtx.range_pop()
 
+
+    @profile(extended_set)
     def gaussian_kernel(self, size, sigma, dim, channels):
-
+        torch.cuda.nvtx.range_push("gaussian.gaussian_kernel")
         kernel_size = 2*size + 1
         kernel_size = [kernel_size] * dim
         kernel = 1
@@ -311,15 +434,23 @@ class gaussain_blur(pl.LightningModule):
         kernel = kernel.view(1, 1, *kernel.size())
         kernel = kernel.repeat(1, channels, 1, 1, 1)
 
+        torch.cuda.nvtx.range_pop()
         return kernel
 
+
+    @profile(extended_set)
     def forward(self, xx):
+        torch.cuda.nvtx.range_push("gaussain_blur.forward")
         xx = xx.reshape(xx.shape[0]*2, 1, xx.shape[2], xx.shape[3], xx.shape[4])
         xx = F.conv3d(xx, self.kernel, padding = (self.kernel.shape[-1]-1)//2)
+
+        torch.cuda.nvtx.range_pop()
         return xx.reshape(xx.shape[0]//2, 2, xx.shape[2], xx.shape[3], xx.shape[4])
 
 
+@profile(extended_set)
 def pre_compute_dilation(time_dims):
+    torch.cuda.nvtx.range_push("pre_compute_dilation")
     dilationdict={}
     #print("Generating Dilation mats")
     for time_dim in time_dims:
@@ -333,6 +464,7 @@ def pre_compute_dilation(time_dims):
                     M[ti,xi,yi,:,:,:] = Conv2d.dilate_kernel(xx,0.5)
                     xx[0,0,ti,xi,yi] = 0.0
         dilationdict[time_dim] = M
+    torch.cuda.nvtx.range_pop()
     return dilationdict
 
 timedims = [16,25,32,64]
