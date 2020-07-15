@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 
 
+import importlib
+TIMEORY_LOADER = importlib.find_loader("timemory")
+TIMEMORY_AVAIL = TIMEMORY_LOADER is not None
+
+
 #
 # Singleton class -- to store profiler
 #
@@ -36,23 +41,19 @@ class Profiler(object, metaclass=Singleton):
 
 
     @property
-    def profiler(self):
+    def profile_decorator(self):
 
-         def identity(f):
-            return f
-   
+        def identity2(*args, **kwargs):
+            def identity(f):
+                return f
+            return identity
+ 
+
         if self.enabled:
             from timemory.profiler import profile
             return profile
         else:
-            return identity
-
-
-    def initialize(self):
-        if self.enabled:
-            import timemory
-            timemory.settings.flat_profile = True
-            timemory.settings.timeline_profile = False
+            return identity2
 
 
     def finalize(self):
@@ -60,3 +61,15 @@ class Profiler(object, metaclass=Singleton):
             import timemory
             timemory.finalize()
 
+
+
+def enable():
+    if TIMEMORY_AVAILABLE:
+        Profiler().enabled = True
+    else:
+        raise RuntimeError("Cannot enable profiling => Timemory not available")
+
+
+
+def disable():
+    Profiler().enables = False

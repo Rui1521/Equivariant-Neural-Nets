@@ -5,17 +5,22 @@ import pytorch_lightning as pl
 #os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3,4,5,6,7"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-from profile import Profiler
+import profiler
+profiler.enable()
 
-prof = Profiler()
-prof.enabled = False
-prof.finalize()
+if profiler.TIMEMORY_AVAILABLE and profiler.Profiler().enabled:
+    import timemory
+    timemory.settings.flat_profile = True
+    timemory.settings.timeline_profile = False
+
 
 
 model = Scale_ResNet()
-trainer = pl.Trainer(gpus=6, max_epochs=1, distributed_backend='ddp')
+trainer = pl.Trainer(gpus=1, max_epochs=1, distributed_backend='dp')
 trainer.fit(model)
 
 trainer.test()
 
-prof.finalize()
+
+if profiler.TIMEMORY_AVAILABLE and profiler.Profiler().enabled:
+    timemory.finalize()
