@@ -1,7 +1,3 @@
-# Timemory profiling 
-import timemory
-from timemory.profiler import profile
-
 import torch
 import math
 import numpy as np
@@ -12,6 +8,9 @@ import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+from prfile import Profiler
+
+profile = Profiler().profiler
 extended_set = ["cpu_clock", "cpu_util",
                 "page_rss", "virtual_memory"]
 
